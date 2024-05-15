@@ -1,0 +1,21 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace DiscordMotorcycleBot.Models
+{
+    internal class UserModel
+    {
+        public required int Id { get; set; }
+        public required ulong DiscordId {  get; set; }
+        public required ShareOption MotorcycleShareOption { get; set; }
+    }
+
+    public enum ShareOption
+    {
+        Public,
+        Private
+    }
+}
