@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DiscordMotorcycleBot.Models
 {
-    internal class UserModel
+    public class UserConfigModel
     {
         public required int Id { get; set; }
         public required ulong DiscordId {  get; set; }
