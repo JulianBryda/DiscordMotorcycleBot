@@ -19,7 +19,7 @@ namespace DiscordMotorcycleBot.Modules
             _logger = logger;
         }
 
-        [SlashCommand("create", "Erstellt alle notwendigen Kategorien, Channels und Rollen!")]
+        [SlashCommand("setup", "Erstellt alle notwendigen Kategorien, Channels und Rollen!")]
         public async Task HandleChannelCreation()
         {
             var guild = Context.Guild;
@@ -48,7 +48,7 @@ namespace DiscordMotorcycleBot.Modules
 
             _context.SaveChanges();
 
-            await RespondAsync("Alle Kategorien, Channles und Rollen wurden erstellt!");
+            await RespondAsync("Alle Kategorien, Channels und Rollen wurden erstellt!");
         }
 
 
@@ -72,7 +72,7 @@ namespace DiscordMotorcycleBot.Modules
 
         private async Task CreateFleetChannel(SocketGuild guild, ICategoryChannel category)
         {
-            if (await guild.CreateTextChannelAsync("Fuhrpark", prop => prop.CategoryId = category.Id) is not IMessageChannel channel)
+            if (await guild.CreateTextChannelAsync("Fuhrpark", prop => ConfigureFleetChannel(prop, category)) is not IMessageChannel channel)
             {
                 Console.WriteLine("Failed to create channel \"Fuhrpark\"!");
                 return;
@@ -102,6 +102,34 @@ namespace DiscordMotorcycleBot.Modules
                 ChannelId = channel.Id,
                 ChannelType = Models.ChannelType.BotInteraction
             });
+        }
+
+        private void ConfigureFleetChannel(TextChannelProperties prop, ICategoryChannel category)
+        {
+            if (_context.SavedRoles.FirstOrDefault(o => o.RoleType == RoleType.BotManager) is not SavedRole savedRole)
+            {
+                _logger.LogCritical("Couldn't find role with RoleType.BotManager in Database!");
+                return;
+            }
+
+            List<Overwrite> overwrites = new();
+
+            var everyonePerm = new OverwritePermissions(
+                sendMessages: PermValue.Deny,
+                readMessageHistory: PermValue.Allow
+                );
+
+            var saveRolePerm = new OverwritePermissions(
+                sendMessages: PermValue.Allow,
+                readMessageHistory: PermValue.Allow
+                );
+
+            overwrites.Add(new Overwrite(Context.Guild.EveryoneRole.Id, PermissionTarget.Role, everyonePerm));
+            overwrites.Add(new Overwrite(savedRole.RoleId, PermissionTarget.Role, saveRolePerm));
+
+
+            prop.CategoryId = category.Id;
+            prop.PermissionOverwrites = overwrites;
         }
 
         private void ConfigureBotInteractionChannel(TextChannelProperties prop, ICategoryChannel category)

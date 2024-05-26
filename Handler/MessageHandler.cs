@@ -16,7 +16,8 @@ namespace DiscordMotorcycleBot.Handler
          
         public async Task InitAsync()
         {
-            _client.MessageReceived += MessageReceivedAsync;
+            // TODO not needed for now!
+            // _client.MessageReceived += MessageReceivedAsync;
         }
 
         private async Task MessageReceivedAsync(SocketMessage message)

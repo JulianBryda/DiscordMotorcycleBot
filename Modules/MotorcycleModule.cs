@@ -12,11 +12,21 @@ namespace DiscordMotorcycleBot.Modules
     {
         private readonly DatabaseContext _context;
         private readonly ILogger<MotorcycleModule> _logger;
+        private readonly ulong _fleetChannelId;
 
         public MotorcycleModule(DatabaseContext context, ILogger<MotorcycleModule> logger)
         {
             _context = context;
             _logger = logger;
+
+            if (context.SavedChannels.FirstOrDefault(o => o.ChannelType == Models.ChannelType.Fleet) is SavedChannel channel)
+            {
+                _fleetChannelId = channel.ChannelId;
+            }
+            else
+            {
+                _logger.LogWarning("SavedChannel \"Fleet\" not found in Database!");
+            }
         }
 
 
@@ -36,7 +46,7 @@ namespace DiscordMotorcycleBot.Modules
             .WithButton(formButton);
 
             await RespondAsync("Hier kannst du ein oder mehrere Motorräder hinzufügen :wink:\n" +
-                "Deine gespeicherten Motorräder können von anderen Mitgliedern eingesehen werden!", components: component.Build());
+                $"Deine gespeicherten Motorräder können von anderen Mitgliedern im Channel <#{_fleetChannelId}> eingesehen werden!", components: component.Build());
         }
 
         [ComponentInteraction("motorcycle_button")]
@@ -63,7 +73,7 @@ namespace DiscordMotorcycleBot.Modules
             _ = UpdateMessage();
 
             await RespondAsync("Dein Motorrad wurde gespeichert!\n" +
-                $"**{modal.Manufacturer} {modal.Model} {modal.BuildYear}**");
+                $"**{modal.Manufacturer} {modal.Model} {modal.BuildYear}**", ephemeral: true);
         }
         #endregion
 

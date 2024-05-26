@@ -15,6 +15,7 @@ namespace DiscordMotorcycleBot.Modules
         #endregion
 
         #region Say Command
+        [RequireRole("Bot-Manager")]
         [SlashCommand("say", "Lass den Bot sprechen!")]
         public async Task HandleSay([Remainder] string text)
         {
