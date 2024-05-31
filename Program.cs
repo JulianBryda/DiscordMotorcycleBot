@@ -3,11 +3,14 @@ using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
 using DiscordMotorcycleBot.Handler;
+using DiscordMotorcycleBot.Models;
 using DiscordMotorcycleBot.Models.Context;
-using DiscordMotorcycleBot.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using System.Runtime.InteropServices;
 
 namespace DiscordMotorcycleBot
 {
@@ -17,9 +20,11 @@ namespace DiscordMotorcycleBot
 
         public async Task MainAsync()
         {
+            ConfigModel.EnsureCreated();
+
             var config = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("config.json")
+                .AddJsonFile("config/config.json")
                 .Build();
 
             using IHost host = Host.CreateDefaultBuilder()
@@ -67,12 +72,20 @@ namespace DiscordMotorcycleBot
 
             client.Ready += async () =>
             {
-                Console.WriteLine("Bot ready!");
-                await slashCommands.RegisterCommandsToGuildAsync(UInt64.Parse(config["testGuild"]));
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    await slashCommands.RegisterCommandsToGuildAsync(ulong.Parse(config["DevGuild"]));
+                    Console.WriteLine("Bot ready in Dev!");
+                }
+                else
+                {
+                    await slashCommands.RegisterCommandsToGuildAsync(ulong.Parse(config["ProdGuild"]));
+                    Console.WriteLine("Bot ready in Prod!");
+                }
             };
 
 
-            await client.LoginAsync(TokenType.Bot, config["tokens:discord"]);
+            await client.LoginAsync(TokenType.Bot, config["Token"]);
             await client.StartAsync();
 
             await Task.Delay(-1);

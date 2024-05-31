@@ -3,7 +3,6 @@ using Discord.Interactions;
 using DiscordMotorcycleBot.Models;
 using DiscordMotorcycleBot.Models.Context;
 using Microsoft.Extensions.Logging;
-using System.Threading.Channels;
 
 
 namespace DiscordMotorcycleBot.Modules

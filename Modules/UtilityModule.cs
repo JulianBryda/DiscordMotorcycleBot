@@ -6,7 +6,7 @@ namespace DiscordMotorcycleBot.Modules
     public class UtilityModule : InteractionModuleBase<SocketInteractionContext>
     {
         #region Ping Command
-        [RequireRole("Bot-Manager")]
+        [Discord.Commands.RequireRole("Bot-Manager")]
         [SlashCommand("ping", "Ping Message!")]
         public async Task HandlePing()
         {
@@ -15,7 +15,7 @@ namespace DiscordMotorcycleBot.Modules
         #endregion
 
         #region Say Command
-        [RequireRole("Bot-Manager")]
+        [Discord.Commands.RequireRole("Bot-Manager")]
         [SlashCommand("say", "Lass den Bot sprechen!")]
         public async Task HandleSay([Remainder] string text)
         {

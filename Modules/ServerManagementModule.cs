@@ -33,7 +33,7 @@ namespace DiscordMotorcycleBot.Modules
 
             if (await guild.CreateCategoryChannelAsync("Features") is not ICategoryChannel category)
             {
-                Console.WriteLine("Failed to create category \"Features\"!");
+                await RespondAsync("Failed to create category \"Features\"!");
                 return;
             }
 
@@ -44,7 +44,6 @@ namespace DiscordMotorcycleBot.Modules
             // channels
             await CreateFleetChannel(guild, category);
             await CreateBotInteractionChannel(guild, category);
-
 
             _context.SaveChanges();
 
@@ -119,14 +118,20 @@ namespace DiscordMotorcycleBot.Modules
                 readMessageHistory: PermValue.Allow
                 );
 
-            var saveRolePerm = new OverwritePermissions(
+            var botRolePerm = new OverwritePermissions(
                 sendMessages: PermValue.Allow,
                 readMessageHistory: PermValue.Allow
                 );
 
             overwrites.Add(new Overwrite(Context.Guild.EveryoneRole.Id, PermissionTarget.Role, everyonePerm));
-            overwrites.Add(new Overwrite(savedRole.RoleId, PermissionTarget.Role, saveRolePerm));
-
+            if (Context.Guild.Roles.FirstOrDefault(o => o.Name == "MotorcycleBot") is SocketRole botRole)
+            {
+                overwrites.Add(new Overwrite(botRole.Id, PermissionTarget.Role, botRolePerm));
+            }
+            else
+            {
+                _logger.LogError("Failed tot assign bot to Fleet channel!");
+            }
 
             prop.CategoryId = category.Id;
             prop.PermissionOverwrites = overwrites;
