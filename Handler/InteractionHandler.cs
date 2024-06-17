@@ -19,10 +19,10 @@ namespace DiscordMotorcycleBot.Handler
             _commands = commands;
             _services = services;
 
-            var channel = context.SavedChannels.FirstOrDefault(o => o.ChannelType == Models.ChannelType.BotInteraction);
+            var channel = context.DiscordEntities.FirstOrDefault(o => o.EntityType.HasFlag(Models.EntityType.Interaction));
             if (channel != null)
             {
-                _interactionChannelId = channel.ChannelId;
+                _interactionChannelId = channel.EntityId;
             }
         }
 
@@ -35,7 +35,7 @@ namespace DiscordMotorcycleBot.Handler
 
         private async Task HandleInteraction(SocketInteraction arg)
         {
-            if (arg.ChannelId != _interactionChannelId && ((SocketSlashCommand)arg).CommandName != "setup")
+            if (arg.ChannelId != _interactionChannelId && ((SocketSlashCommand)arg).CommandName != "install")
             {
                 await ((SocketSlashCommand)arg).RespondAsync($"Commands kannst du nur in diesem Channel nutzen: <#{_interactionChannelId}>", ephemeral: true);
                 return;

@@ -8,8 +8,7 @@ namespace DiscordMotorcycleBot.Models.Context
 
         public DbSet<UserConfigModel> UserConfigs { get; set; }
         public DbSet<MotorcycleModel> Motorcycles { get; set; }
-        public DbSet<SavedChannel> SavedChannels { get; set; }
-        public DbSet<SavedRole> SavedRoles { get; set; }
+        public DbSet<DiscordEntity> DiscordEntities { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

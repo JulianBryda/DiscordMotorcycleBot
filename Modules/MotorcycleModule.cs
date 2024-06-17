@@ -18,9 +18,9 @@ namespace DiscordMotorcycleBot.Modules
             _context = context;
             _logger = logger;
 
-            if (context.SavedChannels.FirstOrDefault(o => o.ChannelType == Models.ChannelType.Fleet) is SavedChannel channel)
+            if (context.DiscordEntities.FirstOrDefault(o => o.EntityType.HasFlag(EntityType.Fleet)) is DiscordEntity channel)
             {
-                _fleetChannelId = channel.ChannelId;
+                _fleetChannelId = channel.EntityId;
             }
             else
             {
@@ -32,20 +32,29 @@ namespace DiscordMotorcycleBot.Modules
         #region Save Motorcycle Command
         [RequireRole("Bot-Manager")]
         [SlashCommand("motorcycle", "Speichere dein Motorrad!")]
-        public async Task HandleMotorcycleInfoCommand()
+        public async Task HandleMotorcycleInfoCommand(string arg = "")
         {
-            var formButton = new ButtonBuilder()
+            if (arg == "refresh")
             {
-                Label = "Formular öffnen",
-                CustomId = "motorcycle_button",
-                Style = ButtonStyle.Primary
-            };
+                await UpdateMessage();
 
-            var component = new ComponentBuilder()
-            .WithButton(formButton);
+                await RespondAsync("Refreshed Fleet List!", ephemeral: true);
+            }
+            else
+            {
+                var formButton = new ButtonBuilder()
+                {
+                    Label = "Formular öffnen",
+                    CustomId = "motorcycle_button",
+                    Style = ButtonStyle.Primary
+                };
 
-            await RespondAsync("Hier kannst du ein oder mehrere Motorräder hinzufügen :wink:\n" +
-                $"Deine gespeicherten Motorräder können von anderen Mitgliedern im Channel <#{_fleetChannelId}> eingesehen werden!", components: component.Build());
+                var component = new ComponentBuilder()
+                .WithButton(formButton);
+
+                await RespondAsync("Hier kannst du ein oder mehrere Motorräder hinzufügen :wink:\n" +
+                    $"Deine gespeicherten Motorräder können von anderen Mitgliedern im Channel <#{_fleetChannelId}> eingesehen werden!", components: component.Build());
+            }
         }
 
         [ComponentInteraction("motorcycle_button")]
@@ -78,15 +87,15 @@ namespace DiscordMotorcycleBot.Modules
 
         private async Task UpdateMessage()
         {
-            if (_context.SavedChannels.FirstOrDefault(o => o.ChannelType == Models.ChannelType.Fleet) is not SavedChannel savedChannel)
+            if (_context.DiscordEntities.FirstOrDefault(o => o.EntityType.HasFlag(EntityType.Fleet)) is not DiscordEntity savedChannel)
             {
                 _logger.LogError("Couldn't find channel with ChannelType.Fleet in Database!");
                 return;
             }
 
-            if (await Context.Client.GetChannelAsync(savedChannel.ChannelId) is not IMessageChannel channel)
+            if (await Context.Client.GetChannelAsync(savedChannel.EntityId) is not IMessageChannel channel)
             {
-                Console.WriteLine($"Failed to get Channel with id \"{savedChannel.ChannelId}\"!");
+                Console.WriteLine($"Failed to get Channel with id \"{savedChannel.EntityId}\"!");
                 return;
             }
 

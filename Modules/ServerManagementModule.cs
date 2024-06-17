@@ -1,10 +1,11 @@
 ﻿using Discord;
-using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
 using DiscordMotorcycleBot.Models;
 using DiscordMotorcycleBot.Models.Context;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
+using System.Data;
 
 namespace DiscordMotorcycleBot.Modules
 {
@@ -19,27 +20,51 @@ namespace DiscordMotorcycleBot.Modules
             _logger = logger;
         }
 
-        [SlashCommand("setup", "Erstellt alle notwendigen Kategorien, Channels und Rollen!")]
-        public async Task HandleChannelCreation()
+        [SlashCommand("uninstall", "Löscht alle vom Bot erstellten Kategorien, Channles und Rollen!")]
+        public async Task HandleUninstall()
         {
             var guild = Context.Guild;
             if (guild == null) return;
 
-            if (guild.CategoryChannels.Any(o => o.Name.Equals("features", StringComparison.CurrentCultureIgnoreCase)))
+            var entities = _context.DiscordEntities.Where(o => o.GuildId == guild.Id);
+
+            foreach (var item in entities)
             {
-                await RespondAsync("Die Kategorie \"Features\" existiert bereits!");
-                return;
+                if (item.EntityType.HasFlag(EntityType.Category))
+                {
+                    await guild.GetCategoryChannel(item.EntityId).DeleteAsync();
+                }
+                else if (item.EntityType.HasFlag(EntityType.Channel))
+                {
+                    await guild.GetTextChannel(item.EntityId).DeleteAsync();
+                }
+                else if (item.EntityType.HasFlag(EntityType.Role))
+                {
+                    await guild.GetRole(item.EntityId).DeleteAsync();
+                }
             }
 
-            if (await guild.CreateCategoryChannelAsync("Features") is not ICategoryChannel category)
-            {
-                await RespondAsync("Failed to create category \"Features\"!");
-                return;
-            }
+            _context.DiscordEntities.RemoveRange(entities);
+            _context.SaveChanges();
 
+            await RespondAsync("Alle Kategorien, Channels und Rollen wurden gelöscht!", ephemeral: true);
+        }
+
+        [SlashCommand("install", "Erstellt alle notwendigen Kategorien, Channels und Rollen!")]
+        public async Task HandleInstall()
+        {
+            var guild = Context.Guild;
+            if (guild == null) return;
+
+            var entities = _context.DiscordEntities.Where(o => o.GuildId == guild.Id);
+            _context.DiscordEntities.RemoveRange(entities);
+
+            // category
+            ICategoryChannel? category = await CreateCategory(guild);
+            if (category == null) return;
 
             // roles
-            await CreateRoles(guild);
+            await CreateRole(guild);
 
             // channels
             await CreateFleetChannel(guild, category);
@@ -51,19 +76,61 @@ namespace DiscordMotorcycleBot.Modules
         }
 
 
-        private async Task CreateRoles(SocketGuild guild)
+        private async Task<ICategoryChannel?> CreateCategory(SocketGuild guild)
         {
-            if (await guild.CreateRoleAsync("Bot-Manager", color: Color.LightGrey) is not IRole role)
+            ICategoryChannel category;
+
+            if (guild.CategoryChannels.FirstOrDefault(o => o.Name.Equals("features", StringComparison.CurrentCultureIgnoreCase)) is not ICategoryChannel cat)
             {
-                _logger.LogError("Failed to create role \"Bot-Manager\"!");
-                return;
+                category = await guild.CreateCategoryChannelAsync("features");
+
+                if (category == null)
+                {
+                    await RespondAsync("Failed to create category \"Features\"!", ephemeral: true);
+                    return null;
+                }
+            }
+            else
+            {
+                category = cat;
             }
 
-            _context.SavedRoles.Add(new SavedRole()
+            _context.DiscordEntities.Add(new DiscordEntity()
             {
                 Id = 0,
-                RoleId = role.Id,
-                RoleType = RoleType.BotManager
+                EntityId = category.Id,
+                EntityType = EntityType.Category,
+                GuildId = guild.Id
+            });
+
+            return category;
+        }
+
+        private async Task CreateRole(SocketGuild guild)
+        {
+            IRole role;
+
+            if (guild.Roles.FirstOrDefault(o => o.Name.Equals("Bot-Manager")) is not IRole rol)
+            {
+                role = await guild.CreateRoleAsync("Bot-Manager", color: Color.LightGrey);
+
+                if (role == null)
+                {
+                    await RespondAsync("Failed to create role \"Bot-Manager\"!", ephemeral: true);
+                    return;
+                }
+            }
+            else
+            {
+                role = rol;
+            }
+
+            _context.DiscordEntities.Add(new DiscordEntity()
+            {
+                Id = 0,
+                EntityId = role.Id,
+                EntityType = EntityType.Role | EntityType.BotManager,
+                GuildId = guild.Id
             });
 
             _context.SaveChanges();
@@ -71,41 +138,65 @@ namespace DiscordMotorcycleBot.Modules
 
         private async Task CreateFleetChannel(SocketGuild guild, ICategoryChannel category)
         {
-            if (await guild.CreateTextChannelAsync("Fuhrpark", prop => ConfigureFleetChannel(prop, category)) is not IMessageChannel channel)
+            IMessageChannel channel;
+
+            if (guild.TextChannels.FirstOrDefault(o => o.Name.Equals("Fuhrpark", StringComparison.CurrentCultureIgnoreCase) && o.CategoryId == category.Id) is not IMessageChannel chan)
             {
-                Console.WriteLine("Failed to create channel \"Fuhrpark\"!");
-                return;
+                channel = await guild.CreateTextChannelAsync("Fuhrpark", prop => ConfigureFleetChannel(prop, category));
+
+                if (channel == null)
+                {
+                    await RespondAsync("Failed to create channel \"Fuhrpark\"!", ephemeral: true);
+                    return;
+                }
+
+                await channel.SendMessageAsync("# __Übersicht aller eingetragenen Motorräder__");
+            }
+            else
+            {
+                channel = chan;
             }
 
-            await channel.SendMessageAsync("# __Übersicht aller eingetragenen Motorräder__");
-
-            _context.SavedChannels.Add(new SavedChannel()
+            _context.DiscordEntities.Add(new DiscordEntity()
             {
                 Id = 0,
-                ChannelId = channel.Id,
-                ChannelType = Models.ChannelType.Fleet
+                EntityId = channel.Id,
+                EntityType = EntityType.Channel | EntityType.Fleet,
+                GuildId = guild.Id
             });
         }
 
         private async Task CreateBotInteractionChannel(SocketGuild guild, ICategoryChannel category)
         {
-            if (await guild.CreateTextChannelAsync("Interaktionen", prop => ConfigureBotInteractionChannel(prop, category)) is not IMessageChannel channel)
+            IMessageChannel channel;
+
+            if (guild.TextChannels.FirstOrDefault(o => o.Name.Equals("Interaktionen", StringComparison.CurrentCultureIgnoreCase) && o.CategoryId == category.Id) is not IMessageChannel chan)
             {
-                Console.WriteLine("Failed to create channel \"Interaktionen\"!");
-                return;
+                channel = await guild.CreateTextChannelAsync("Interaktionen", prop => ConfigureBotInteractionChannel(prop, category));
+
+                if (channel == null)
+                {
+                    await RespondAsync("Failed to create channel \"Interaktionen\"!", ephemeral: true);
+                    return;
+                }
+            }
+            else
+            {
+                channel = chan;
             }
 
-            _context.SavedChannels.Add(new SavedChannel()
+            _context.DiscordEntities.Add(new DiscordEntity()
             {
                 Id = 0,
-                ChannelId = channel.Id,
-                ChannelType = Models.ChannelType.BotInteraction
+                EntityId = channel.Id,
+                EntityType = EntityType.Channel | EntityType.Interaction,
+                GuildId = guild.Id
             });
         }
 
         private void ConfigureFleetChannel(TextChannelProperties prop, ICategoryChannel category)
         {
-            if (_context.SavedRoles.FirstOrDefault(o => o.RoleType == RoleType.BotManager) is not SavedRole savedRole)
+            if (_context.DiscordEntities.FirstOrDefault(o => o.EntityType.HasFlag(EntityType.Role)) is not DiscordEntity savedRole)
             {
                 _logger.LogCritical("Couldn't find role with RoleType.BotManager in Database!");
                 return;
@@ -139,7 +230,7 @@ namespace DiscordMotorcycleBot.Modules
 
         private void ConfigureBotInteractionChannel(TextChannelProperties prop, ICategoryChannel category)
         {
-            if (_context.SavedRoles.FirstOrDefault(o => o.RoleType == RoleType.BotManager) is not SavedRole savedRole)
+            if (_context.DiscordEntities.FirstOrDefault(o => o.EntityType.HasFlag(EntityType.Role)) is not DiscordEntity savedRole)
             {
                 _logger.LogCritical("Couldn't find role with RoleType.BotManager in Database!");
                 return;
@@ -158,7 +249,7 @@ namespace DiscordMotorcycleBot.Modules
                 );
 
             overwrites.Add(new Overwrite(Context.Guild.EveryoneRole.Id, PermissionTarget.Role, everyonePerm));
-            overwrites.Add(new Overwrite(savedRole.RoleId, PermissionTarget.Role, saveRolePerm));
+            overwrites.Add(new Overwrite(savedRole.EntityId, PermissionTarget.Role, saveRolePerm));
 
 
             prop.CategoryId = category.Id;
