@@ -8,7 +8,10 @@ using DiscordMotorcycleBot.Models.Context;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace DiscordMotorcycleBot
 {
@@ -57,6 +60,7 @@ namespace DiscordMotorcycleBot
 
             var client = provider.GetRequiredService<DiscordSocketClient>();
             var config = provider.GetRequiredService<IConfigurationRoot>();
+            var logger = provider.GetRequiredService<ILogger<Program>>();
 
             await provider.GetRequiredService<DatabaseContext>().Database.EnsureCreatedAsync();
 
@@ -65,20 +69,20 @@ namespace DiscordMotorcycleBot
 
             await provider.GetRequiredService<MessageHandler>().InitAsync();
 
-            client.Log += async (LogMessage msg) => { Console.WriteLine(msg.Message); };
-            slashCommands.Log += async (LogMessage msg) => { Console.WriteLine(msg.Message); };
+            client.Log += (LogMessage msg) => { return Handle_Log(msg, logger); };
+            slashCommands.Log += (LogMessage msg) => { return Handle_Log(msg, logger); };
 
             client.Ready += async () =>
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     await slashCommands.RegisterCommandsToGuildAsync(ulong.Parse(config["DevGuild"]));
-                    Console.WriteLine("Bot ready in Dev!");
+                    logger.LogInformation("Commands registered to Dev!");
                 }
                 else
                 {
                     await slashCommands.RegisterCommandsToGuildAsync(ulong.Parse(config["ProdGuild"]));
-                    Console.WriteLine("Bot ready in Prod!");
+                    logger.LogInformation("Commands registered to Prod!");
                 }
             };
 
@@ -87,6 +91,41 @@ namespace DiscordMotorcycleBot
             await client.StartAsync();
 
             await Task.Delay(-1);
+        }
+
+        private Task Handle_Log(LogMessage arg, ILogger<Program> logger)
+        {
+            if (arg.Exception != null)
+            {
+                logger.Log(TranslateSeverityToLevel(arg.Severity), "{StackTrace}\n{ExceptionMessage}\n{Message}", arg.Exception.StackTrace, arg.Exception.Message, arg.Message);
+            }
+            else
+            {
+                logger.Log(TranslateSeverityToLevel(arg.Severity), "{Message}", arg.Message);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private LogLevel TranslateSeverityToLevel(LogSeverity severity)
+        {
+            switch (severity)
+            {
+                case LogSeverity.Critical:
+                    return LogLevel.Critical;
+                case LogSeverity.Error:
+                    return LogLevel.Error;
+                case LogSeverity.Warning:
+                    return LogLevel.Warning;
+                case LogSeverity.Info:
+                    return LogLevel.Information;
+                case LogSeverity.Verbose:
+                    return LogLevel.Trace;
+                case LogSeverity.Debug:
+                    return LogLevel.Debug;
+                default:
+                    return LogLevel.None;
+            }
         }
     }
 }

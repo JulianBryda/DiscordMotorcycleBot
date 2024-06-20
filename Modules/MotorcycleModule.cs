@@ -4,7 +4,6 @@ using DiscordMotorcycleBot.Models;
 using DiscordMotorcycleBot.Models.Context;
 using Microsoft.Extensions.Logging;
 
-
 namespace DiscordMotorcycleBot.Modules
 {
     public class MotorcycleModule : InteractionModuleBase<SocketInteractionContext>
@@ -66,8 +65,7 @@ namespace DiscordMotorcycleBot.Modules
         [ModalInteraction("motorcycle_save_modal")]
         public async Task HandleModalInput(MotorcycleModal modal)
         {
-            using DatabaseContext context = new();
-            context.Motorcycles.Add(new MotorcycleModel()
+            _context.Motorcycles.Add(new MotorcycleModel()
             {
                 Id = 0,
                 Manufacturer = modal.Manufacturer,
@@ -76,7 +74,7 @@ namespace DiscordMotorcycleBot.Modules
                 DiscordId = Context.User.Id
             });
 
-            context.SaveChanges();
+            _context.SaveChanges();
 
             _ = UpdateMessage();
 
@@ -99,12 +97,8 @@ namespace DiscordMotorcycleBot.Modules
                 return;
             }
 
-            if (await channel.GetMessagesAsync(1).FirstOrDefaultAsync() is not IReadOnlyCollection<IMessage> message)
-            {
-                Console.WriteLine("Failed to get Message!");
-                return;
-            }
-
+            var messages = await channel.GetMessagesAsync(20).FlattenAsync();
+            int messageIndex = messages.Count() - 1;
 
             string newContent = "# __Übersicht aller eingetragenen Motorräder__\n\n";
             ulong lastUser = 0;
@@ -113,7 +107,22 @@ namespace DiscordMotorcycleBot.Modules
             {
                 if (lastUser != item.DiscordId)
                 {
-                    newContent += $"### Motorräder von {Context.Client.GetUser(item.DiscordId).Mention}\n";
+                    if (newContent.Length > 1800)
+                    {
+                        if (messageIndex >= 0)
+
+                        {
+                            await channel.ModifyMessageAsync(messages.ElementAt(messageIndex).Id, msg => msg.Content = newContent);
+                            messageIndex--;
+                        }
+                        else
+                        {
+                            await channel.SendMessageAsync(newContent);
+                        }
+                        newContent = "";
+                    }
+
+                    newContent += $"### Motorräder von <@{item.DiscordId}>\n";
                 }
 
                 newContent += $"\t- {item.Manufacturer} {item.Model} {item.BuildYear}\n";
@@ -121,10 +130,14 @@ namespace DiscordMotorcycleBot.Modules
                 lastUser = item.DiscordId;
             }
 
-            newContent += "\n\n";
-
-
-            await ((IUserMessage)message.First()).ModifyAsync(msg => msg.Content = newContent);
+            if (messageIndex >= 0)
+            {
+                await channel.ModifyMessageAsync(messages.ElementAt(messageIndex).Id, msg => msg.Content = newContent);
+            }
+            else
+            {
+                await channel.SendMessageAsync(newContent);
+            }
         }
     }
 

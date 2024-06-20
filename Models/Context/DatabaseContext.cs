@@ -5,7 +5,7 @@ namespace DiscordMotorcycleBot.Models.Context
 {
     public class DatabaseContext : DbContext
     {
-
+        public DbSet<AssociationMemberModel> AssociationMembers { get; set; }
         public DbSet<UserConfigModel> UserConfigs { get; set; }
         public DbSet<MotorcycleModel> Motorcycles { get; set; }
         public DbSet<DiscordEntity> DiscordEntities { get; set; }

@@ -4,7 +4,6 @@ using Discord.WebSocket;
 using DiscordMotorcycleBot.Models;
 using DiscordMotorcycleBot.Models.Context;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualBasic;
 using System.Data;
 
 namespace DiscordMotorcycleBot.Modules

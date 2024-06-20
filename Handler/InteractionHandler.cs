@@ -2,7 +2,10 @@
 using Discord.WebSocket;
 using DiscordMotorcycleBot.Models.Context;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace DiscordMotorcycleBot.Handler
 {
@@ -12,12 +15,24 @@ namespace DiscordMotorcycleBot.Handler
         private readonly InteractionService _commands;
         private readonly IServiceProvider _services;
         private readonly ulong _interactionChannelId;
+        private readonly ulong _guildId;
 
-        public InteractionHandler(DiscordSocketClient client, InteractionService commands, IServiceProvider services, DatabaseContext context)
+        public InteractionHandler(DiscordSocketClient client, InteractionService commands, IServiceProvider services, DatabaseContext context, IConfigurationRoot config, ILogger<InteractionHandler> logger)
         {
             _client = client;
             _commands = commands;
             _services = services;
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                _guildId = ulong.Parse(config["DevGuild"]);
+                logger.LogInformation("Listening for Commands in Dev!");
+            }
+            else
+            {
+                _guildId = ulong.Parse(config["ProdGuild"]);
+                logger.LogInformation("Listening for Commands in Prod!");
+            }
 
             var channel = context.DiscordEntities.FirstOrDefault(o => o.EntityType.HasFlag(Models.EntityType.Interaction));
             if (channel != null)
@@ -35,7 +50,9 @@ namespace DiscordMotorcycleBot.Handler
 
         private async Task HandleInteraction(SocketInteraction arg)
         {
-            if (arg.ChannelId != _interactionChannelId && ((SocketSlashCommand)arg).CommandName != "install")
+            if (_guildId != arg.GuildId) return;
+
+            if (arg.ChannelId != _interactionChannelId && ((SocketSlashCommand)arg).CommandName != "install" && ((SocketSlashCommand)arg).CommandName != "say")
             {
                 await ((SocketSlashCommand)arg).RespondAsync($"Commands kannst du nur in diesem Channel nutzen: <#{_interactionChannelId}>", ephemeral: true);
                 return;
