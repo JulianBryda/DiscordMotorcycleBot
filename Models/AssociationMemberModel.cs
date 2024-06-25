@@ -21,5 +21,6 @@ namespace DiscordMotorcycleBot.Models
     {
         Active,
         Inactive,
+        Deleted
     }
 }
